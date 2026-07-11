@@ -1,5 +1,7 @@
 # Transpositor de Cifras V2
 
+Link da App: https://transpositor-cifras.streamlit.app/
+
 Aplicação Streamlit para transpor cifras em Word e PDF e converter entre acordes e Nashville Number System. A V2 preserva os comportamentos da V1 e separa a lógica musical do processamento de documentos e da interface.
 
 ## Funcionalidades
