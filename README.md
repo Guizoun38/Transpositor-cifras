@@ -1,57 +1,63 @@
-# Transpositor de Cifras em Word
+# Transpositor de Cifras V2
 
-Aplicação Streamlit que importa uma cifra musical em `.docx`, transpõe o
-tom indicado no cabeçalho e os acordes da música para uma nova tonalidade,
-mantendo intacta toda a restante formatação e conteúdo do documento
-(letra, estrutura, tabelas, cabeçalhos, rodapés, fontes, cores, etc.).
+Aplicação Streamlit para transpor cifras em Word e PDF e converter entre acordes e Nashville Number System. A V2 preserva os comportamentos da V1 e separa a lógica musical do processamento de documentos e da interface.
 
-## Instalação
+## Funcionalidades
 
-```bash
+- Acordes → acordes, acordes → Nashville e Nashville → acordes.
+- Extensões, acidentes e inversões (`Bbm7`, `Ebsus4`, `Eb/G`, `b7`, `5/7`).
+- Processamento de corpo, tabelas, cabeçalhos e rodapés do Word por `run.text`.
+- PDFs com texto selecionável, preservando páginas e conteúdo não musical.
+- Deteção conservadora para proteger letras, secções, BPM e compasso.
+- O original nunca é alterado; é sempre produzida uma nova cópia.
+
+## Arquitetura
+
+```text
+domain/          modelos, regras musicais e erros
+application/     pedidos, portas e casos de uso
+infrastructure/  processadores DOCX e PDF
+presentation/    interface Streamlit
+tests/           testes unitários, sintéticos e fixtures reais
+```
+
+## Instalação e execução
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+python -m pytest
+python -m streamlit run app.py
 ```
 
-## Execução
+Para desenvolvimento e testes, instale `requirements-dev.txt` em vez de
+`requirements.txt`.
 
-```bash
-streamlit run app.py
-```
+## Publicação na internet
 
-## Como usar
+A aplicação está preparada para o Streamlit Community Cloud. Para manter os
+documentos de teste protegidos, recomenda-se um repositório GitHub privado e a
+aplicação Streamlit configurada como pública.
 
-1. Carregar o ficheiro Word (`.docx`) com a cifra.
-2. Selecionar o tom original da música.
-3. Selecionar o novo tom pretendido.
-4. Clicar em "Transpor ficheiro".
-5. Clicar em "Descarregar ficheiro" para obter a cópia transposta
-   (o ficheiro original nunca é alterado).
+1. Criar um repositório privado no GitHub e enviar este projeto.
+2. Aceder a <https://share.streamlit.io> e entrar com a conta GitHub.
+3. Selecionar **Create app** e indicar o repositório, a branch e `app.py`.
+4. Em **Advanced settings**, selecionar Python 3.12.
+5. Após publicar, abrir **Share** e escolher **Make this app public**.
+6. Partilhar o endereço permanente `https://...streamlit.app`.
 
-## Como funciona
+O servidor recebe os ficheiros enviados pelo navegador para os processar em
+memória. Não envie documentos confidenciais para uma instalação pública sem
+avaliar previamente os requisitos de privacidade da organização.
 
-- A linha `Tom <nota>` no cabeçalho do documento é localizada e apenas a
-  nota é substituída.
-- Linhas identificadas como linhas de acordes (compostas maioritariamente
-  por acordes, espaços, `/` e `|`) têm os seus acordes transpostos pela
-  mesma distância em semitons entre o tom original e o novo tom.
-- A escolha entre sustenidos e bemóis é feita automaticamente consoante a
-  tonalidade de destino (ex: `Ab`, `Eb`, `Bb`, `Db`, `Gb`, `F` usam
-  bemóis; `G`, `D`, `A`, `E`, `B`, `F#` usam sustenidos).
-- Acordes com baixo invertido (ex: `Eb/G`) têm a nota principal e a nota
-  do baixo transpostas separadamente.
-- A extensão do acorde (`m`, `7`, `sus4`, `maj7`, `add9`, `dim`, `aug`,
-  etc.) é sempre preservada.
-- A letra da música, indicações musicais, observações e nomes de secções
-  (ex: `[Intro]`, `[Refrão]`) nunca são alterados.
-- A alteração é feita ao nível dos `run.text` de cada parágrafo (nunca
-  `paragraph.text`), para preservar fonte, tamanho, cor, negrito, itálico,
-  sublinhado e restante formatação do Word.
-- São verificados parágrafos do corpo do documento, tabelas, cabeçalhos e
-  rodapés.
+Exemplos: `Ab Eb Fm Db` de Ab para C produz `C G Am F`; em Nashville produz `1 5 6m 4`. `19 5sus4 2m7 4` em C produz `C9 Gsus4 Dm7 F`.
 
-## Limitações desta primeira versão
+## Limitações
 
-- Suporta apenas ficheiros `.docx` (não PDF, imagem, TXT ou OCR).
-- Não converte Nashville Number System.
-- Não identifica automaticamente o tom original — tem de ser selecionado.
-- Não corrige acordes escritos incorretamente no documento original.
-- Não altera a estrutura, a letra ou as indicações musicais da cifra.
+O Word pode dividir texto entre runs; a aplicação faz substituições localizadas e mantém a formatação do primeiro run afetado. Substituições ambíguas devem ser revistas.
+
+PDF é menos editável: só são suportados PDFs com texto selecionável, sem OCR. A fonte original pode não estar disponível, acordes maiores podem sofrer pequenos desalinhamentos e o resultado deve ser revisto. As páginas não são rasterizadas.
+
+Os testes de integração criam documentos DOCX e PDF sintéticos em memória, sem
+publicar documentos reais no repositório.
