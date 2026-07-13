@@ -18,8 +18,19 @@ def test_lyrics_and_sections_are_not_chord_lines(text):
     assert is_chord_line(text) is False
 
 
-def test_only_header_key_is_changed():
-    assert replace_key("Felipe Rodrigues - Tom Ab; Bpm 69; 4/4", "C") == "Felipe Rodrigues - Tom C; Bpm 69; 4/4"
+def test_replace_key_changes_minister_key():
+    assert replace_key("Pra. Giovanna - Tom Ab", "C") == "Pra. Giovanna - Tom C"
+
+
+def test_original_key_metadata_is_preserved_during_conversion():
+    request = ConversionRequest(ConversionMode.CHORDS_TO_CHORDS, "E", "C")
+    metadata = "Artista/Banda: Fhop e Nívea Soares - Tom E; Bpm 72; 4/4"
+    assert convert_musical_text(metadata, request) == metadata
+
+
+def test_minister_key_is_changed_during_conversion():
+    request = ConversionRequest(ConversionMode.CHORDS_TO_CHORDS, "E", "C")
+    assert convert_musical_text("Pra. Giovanna - Tom E", request) == "Pra. Giovanna - Tom C"
 
 
 @pytest.mark.parametrize("chord, expected", [("Ab", "1"), ("Fm", "6m"), ("Bbm7", "2m7"),
@@ -45,6 +56,33 @@ def test_nashville_detection(text, expected):
     assert is_nashville_line(text) is expected
 
 
+@pytest.mark.parametrize("text", ["| E /// |", "| E //// |"])
+def test_short_chord_lines_with_repeated_slashes_are_detected(text):
+    assert is_chord_line(text) is True
+
+
+@pytest.mark.parametrize("text", ["| 6 /// |", "| 4 //// |"])
+def test_short_nashville_lines_with_repeated_slashes_are_detected(text):
+    assert is_nashville_line(text) is True
+
+
 def test_text_conversion_preserves_structure():
     request = ConversionRequest(ConversionMode.CHORDS_TO_CHORDS, "Ab", "C")
     assert convert_musical_text("| Ab / Eb / | Db / Ab / |", request) == "| C / G / | F / C / |"
+
+
+def test_intro_chord_line_is_transposed():
+    request = ConversionRequest(ConversionMode.CHORDS_TO_CHORDS, "E", "C")
+    assert convert_musical_text("| E /// |", request) == "| C /// |"
+
+
+def test_intro_chord_line_converts_to_nashville():
+    request = ConversionRequest(ConversionMode.CHORDS_TO_NASHVILLE, "E", None)
+    assert convert_musical_text("| E /// |", request) == "| 1 /// |"
+
+
+@pytest.mark.parametrize("source, expected", [("| 6 /// |", "| A /// |"),
+                                                ("| 4 /// |", "| F /// |")])
+def test_intro_and_interlude_nashville_lines_convert_to_chords(source, expected):
+    request = ConversionRequest(ConversionMode.NASHVILLE_TO_CHORDS, None, "C")
+    assert convert_musical_text(source, request) == expected

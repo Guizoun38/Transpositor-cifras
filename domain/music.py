@@ -13,6 +13,11 @@ TONES = ["C", "C#", "Db", "D", "D#", "Eb", "E", "F", "F#", "Gb", "G", "G#", "Ab"
 CHORD_RE = re.compile(r"^([A-G](?:#|b)?)([^/\s]*?)(?:/([A-G](?:#|b)?))?$")
 NASHVILLE_RE = re.compile(r"^([b#]?)([1-7])([^/\s]*?)(?:/([b#]?)([1-7]))?$")
 TOM_RE = re.compile(r"(Tom\s+)([A-G](?:#|b)?m?)\b", re.IGNORECASE)
+ORIGINAL_KEY_CONTEXT_RE = re.compile(
+    r"\b(?:artista|banda|ritmo|bpm|tom\s+original)\b",
+    re.IGNORECASE,
+)
+STRUCTURAL_SLASH_RE = re.compile(r"^/+$")
 
 
 def _root(key: str) -> str:
@@ -102,7 +107,11 @@ def is_chord_line(text: str) -> bool:
     stripped = text.strip()
     if not stripped or stripped.startswith("[") or TOM_RE.search(stripped):
         return False
-    tokens = [token for token in re.findall(r"[^\s|]+", stripped) if token != "/"]
+    tokens = [
+        token
+        for token in re.findall(r"[^\s|]+", stripped)
+        if not STRUCTURAL_SLASH_RE.fullmatch(token)
+    ]
     if not tokens:
         return False
     valid = sum(bool(CHORD_RE.fullmatch(t)) for t in tokens)
@@ -113,8 +122,17 @@ def is_nashville_line(text: str) -> bool:
     stripped = text.strip()
     if not stripped or stripped.startswith("[") or re.search(r"\b(?:bpm|tom)\b", stripped, re.I) or re.fullmatch(r"\s*4/4\s*", stripped):
         return False
-    tokens = [t for t in re.findall(r"[^\s|]+", stripped) if t != "/"]
+    tokens = [
+        token
+        for token in re.findall(r"[^\s|]+", stripped)
+        if not STRUCTURAL_SLASH_RE.fullmatch(token)
+    ]
     return bool(tokens) and sum(bool(NASHVILLE_RE.fullmatch(t)) for t in tokens) / len(tokens) >= 0.7
+
+
+def is_original_key_metadata(text: str) -> bool:
+    """Identify the descriptive source-key line, which must stay unchanged."""
+    return bool(TOM_RE.search(text) and ORIGINAL_KEY_CONTEXT_RE.search(text))
 
 
 def replace_key(text: str, target_key: str) -> str:

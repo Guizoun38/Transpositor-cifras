@@ -1,6 +1,7 @@
 import io
 
 import pymupdf as fitz
+import pytest
 from docx import Document
 
 from application.models import ConversionRequest
@@ -21,17 +22,59 @@ def _pdf_words(document):
 
 def test_generated_docx_integration():
     original = Document()
-    original.add_paragraph("Felipe Rodrigues - Tom Ab; Bpm 69; 4/4", style="Heading 1")
+    original.add_paragraph("Pra. Giovanna - Tom Ab", style="Heading 1")
     original.add_paragraph("Ab Eb Fm Db")
     original.add_paragraph("Vem, Senhor")
     source = io.BytesIO(); original.save(source)
     result = process_document(source.getvalue(), ".docx", REQUEST)
     doc, text = _docx_text(result)
-    assert "Tom C; Bpm 69; 4/4" in text
+    assert "Pra. Giovanna - Tom C" in text
     assert "C G Am F" in text
     assert "Vem, Senhor" in text
     assert len(doc.paragraphs) == 3
     assert doc.paragraphs[0].style.name == "Heading 1"
+
+
+@pytest.mark.parametrize(
+    "conversion_request, intro, interlude, expected_intro, expected_interlude, expected_minister",
+    [
+        (
+            ConversionRequest(ConversionMode.CHORDS_TO_CHORDS, "E", "C"),
+            "| E /// |", "| A /// |", "| C /// |", "| F /// |", "Tom C",
+        ),
+        (
+            ConversionRequest(ConversionMode.CHORDS_TO_NASHVILLE, "E", None),
+            "| E /// |", "| A /// |", "| 1 /// |", "| 4 /// |", "Tom E",
+        ),
+        (
+            ConversionRequest(ConversionMode.NASHVILLE_TO_CHORDS, None, "C"),
+            "| 6 /// |", "| 4 /// |", "| A /// |", "| F /// |", "Tom C",
+        ),
+    ],
+)
+def test_docx_intro_interlude_and_key_headers(
+    conversion_request, intro, interlude, expected_intro, expected_interlude, expected_minister
+):
+    original = Document()
+    paragraph = original.add_paragraph()
+    paragraph.add_run(
+        "Artista/Banda: Fhop e Nívea Soares - Tom E; Bpm 72; 4/4\n"
+        "Pra. Giovanna - Tom E\n"
+        "[Intro]\n"
+        f"{intro}\n"
+        "[Interlúdio]\n"
+        f"{interlude}"
+    )
+    source = io.BytesIO()
+    original.save(source)
+
+    result = process_document(source.getvalue(), ".docx", conversion_request)
+    _, text = _docx_text(result)
+
+    assert "Artista/Banda: Fhop e Nívea Soares - Tom E; Bpm 72; 4/4" in text
+    assert f"Pra. Giovanna - {expected_minister}" in text
+    assert expected_intro in text
+    assert expected_interlude in text
 
 
 def test_generated_pdf_integration():

@@ -3,7 +3,8 @@ import re
 from application.models import ConversionRequest
 from domain.errors import InvalidConversionRequestError
 from domain.models import ConversionMode
-from domain.music import (chord_to_nashville, is_chord_line, is_nashville_line,
+from domain.music import (chord_to_nashville, is_chord_line,
+                          is_nashville_line, is_original_key_metadata,
                           nashville_to_chord, replace_key, transpose_chord)
 
 
@@ -19,6 +20,8 @@ def validate_request(request: ConversionRequest):
 def convert_musical_text(text: str, request: ConversionRequest) -> str:
     validate_request(request)
     if request.mode is not ConversionMode.CHORDS_TO_NASHVILLE and re.search(r"\bTom\s+", text, re.I):
+        if is_original_key_metadata(text):
+            return text
         return replace_key(text, request.target_key)
     chord_mode = request.mode in (ConversionMode.CHORDS_TO_CHORDS, ConversionMode.CHORDS_TO_NASHVILLE)
     if chord_mode and not is_chord_line(text):
