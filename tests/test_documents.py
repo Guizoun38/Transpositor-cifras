@@ -20,6 +20,17 @@ def _pdf_words(document):
     return [word for page in document for word in page.get_text("words")]
 
 
+def _assert_replacement_fits_before_bars(result, expected):
+    converted = fitz.open(stream=result, filetype="pdf")
+    words = _pdf_words(converted)
+    replacement = next(word for word in words if word[4] == expected)
+    bars = next(word for word in words if word[4] == "///")
+    assert replacement[2] <= bars[0]
+    assert abs((replacement[3] - replacement[1]) - (bars[3] - bars[1])) < 0.1
+    assert bars[4] == "///"
+    converted.close()
+
+
 def test_generated_docx_integration():
     original = Document()
     original.add_paragraph("Pra. Giovanna - Tom Ab", style="Heading 1")
@@ -175,6 +186,26 @@ def test_pdf_nashville_lines_with_performance_notes_convert_to_chords():
     assert all(token in words for token in ("Apenas", "Guitarra", "Notas", "Harmonia)"))
     assert not any(token in words for token in ("6m", "b7M", "6M", "3m", "2m"))
     converted.close()
+
+
+@pytest.mark.parametrize(
+    "source_text, conversion_request, expected",
+    [
+        ("B ///", ConversionRequest(ConversionMode.CHORDS_TO_CHORDS, "E", "G#"), "D#"),
+        ("B ///", ConversionRequest(ConversionMode.CHORDS_TO_CHORDS, "E", "Ab"), "Eb"),
+        ("G ///", ConversionRequest(ConversionMode.CHORDS_TO_NASHVILLE, "Db", None), "b5"),
+        ("5 ///", ConversionRequest(ConversionMode.NASHVILLE_TO_CHORDS, None, "G#"), "D#"),
+        ("5 ///", ConversionRequest(ConversionMode.NASHVILLE_TO_CHORDS, None, "Ab"), "Eb"),
+    ],
+)
+def test_pdf_wider_replacements_do_not_cover_measure_bars(source_text, conversion_request, expected):
+    source_doc = fitz.open(); page = source_doc.new_page()
+    page.insert_text((72, 72), source_text, fontsize=9)
+    source = source_doc.tobytes(); source_doc.close()
+
+    result = process_document(source, ".pdf", conversion_request)
+
+    _assert_replacement_fits_before_bars(result, expected)
 
 
 def test_pdf_untouched_lyrics_keep_original_formatting():

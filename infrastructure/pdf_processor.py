@@ -45,6 +45,17 @@ def _span_for_word(spans, word_rect):
     return spans[0] if spans else {"size": 11, "color": 0, "origin": (word_rect.x0, word_rect.y1 - 1)}
 
 
+def _horizontal_scale(text, fontname, fontsize, available_width):
+    """Fit replacement text before the next PDF token without changing its height."""
+    if available_width is None:
+        return 1.0
+    text_width = fitz.get_text_length(text, fontname=fontname, fontsize=fontsize)
+    safe_width = max(available_width - 0.25, 0)
+    if not text_width or text_width <= safe_width:
+        return 1.0
+    return safe_width / text_width
+
+
 def _page_lines(page):
     """Return words and their original spans grouped by PDF text line."""
     words_by_line = defaultdict(list)
@@ -81,28 +92,34 @@ class PdfProcessor(DocumentProcessor):
                 if converted_line == original_line or len(converted_tokens) != len(original_tokens):
                     continue
 
-                for word, old, new in zip(words, original_tokens, converted_tokens):
+                for index, (word, old, new) in enumerate(zip(words, original_tokens, converted_tokens)):
                     if old == new:
                         continue
                     rect = fitz.Rect(word[:4])
                     span = _span_for_word(spans, rect)
-                    changes.append((rect, new, span))
+                    available_width = words[index + 1][0] - rect.x0 if index + 1 < len(words) else None
+                    changes.append((rect, new, span, available_width))
 
             # Only changed words are redacted. Lyrics, headings, links and all
             # other spans remain the original PDF objects and keep formatting.
-            for rect, _, _ in changes:
+            for rect, _, _, _ in changes:
                 page.add_redact_annot(rect, fill=(1, 1, 1))
             if changes:
                 page.apply_redactions()
 
-            for rect, text, span in changes:
+            for rect, text, span, available_width in changes:
                 baseline = span.get("origin", (rect.x0, rect.y1 - 1))[1]
+                point = fitz.Point(rect.x0, baseline)
+                fontsize = span.get("size", 11)
+                fontname = _base14_font(span)
+                scale = _horizontal_scale(text, fontname, fontsize, available_width)
                 page.insert_text(
-                    fitz.Point(rect.x0, baseline),
+                    point,
                     text,
-                    fontsize=span.get("size", 11),
-                    fontname=_base14_font(span),
+                    fontsize=fontsize,
+                    fontname=fontname,
                     color=_color(span.get("color", 0)),
+                    morph=(point, fitz.Matrix(scale, 1)) if scale < 1 else None,
                     overlay=True,
                 )
 
