@@ -77,6 +77,25 @@ def test_docx_intro_interlude_and_key_headers(
     assert expected_interlude in text
 
 
+def test_docx_chord_lines_with_performance_notes_convert_to_nashville():
+    original = Document()
+    original.add_paragraph(
+        "B A F#m   (frase guitarra em A)\n"
+        "C#m DM E A G#m E (A partir da 3ªx - Apenas Guitarra e baixo)\n"
+        "| C#m /// | E /// | A/ G#m / | F#m / E / | (frase todos instrumentos Harmonia)"
+    )
+    source = io.BytesIO()
+    original.save(source)
+    request = ConversionRequest(ConversionMode.CHORDS_TO_NASHVILLE, "E", None)
+
+    result = process_document(source.getvalue(), ".docx", request)
+    _, text = _docx_text(result)
+
+    assert "5 4 2m   (frase guitarra em A)" in text
+    assert "6m b7M 1 4 3m 1 (A partir da 3ªx - Apenas Guitarra e baixo)" in text
+    assert "| 6m /// | 1 /// | 4/ 3m / | 2m / 1 / | (frase todos instrumentos Harmonia)" in text
+
+
 def test_generated_pdf_integration():
     source_doc = fitz.open(); page = source_doc.new_page()
     page.insert_text((72, 72), "Tom Ab\n\nAb Eb Fm Db\nVem, Senhor")

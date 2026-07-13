@@ -81,6 +81,33 @@ def test_intro_chord_line_converts_to_nashville():
     assert convert_musical_text("| E /// |", request) == "| 1 /// |"
 
 
+@pytest.mark.parametrize(
+    "source, expected",
+    [
+        (
+            "B A F#m   (frase guitarra em A)",
+            "5 4 2m   (frase guitarra em A)",
+        ),
+        (
+            "C#m DM E A G#m E (A partir da 3ªx - Apenas Guitarra e baixo)",
+            "6m b7M 1 4 3m 1 (A partir da 3ªx - Apenas Guitarra e baixo)",
+        ),
+        (
+            "| C#m /// | E /// | A/ G#m / | F#m / E / | (frase todos instrumentos Harmonia)",
+            "| 6m /// | 1 /// | 4/ 3m / | 2m / 1 / | (frase todos instrumentos Harmonia)",
+        ),
+    ],
+)
+def test_chord_lines_with_trailing_performance_notes_convert_to_nashville(source, expected):
+    request = ConversionRequest(ConversionMode.CHORDS_TO_NASHVILLE, "E", None)
+    assert convert_musical_text(source, request) == expected
+
+
+def test_parenthesized_chord_quality_is_still_converted():
+    request = ConversionRequest(ConversionMode.CHORDS_TO_NASHVILLE, "C", None)
+    assert convert_musical_text("C(add9) G", request) == "1(add9) 5"
+
+
 @pytest.mark.parametrize("source, expected", [("| 6 /// |", "| A /// |"),
                                                 ("| 4 /// |", "| F /// |")])
 def test_intro_and_interlude_nashville_lines_convert_to_chords(source, expected):

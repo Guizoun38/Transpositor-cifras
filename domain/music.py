@@ -18,6 +18,7 @@ ORIGINAL_KEY_CONTEXT_RE = re.compile(
     re.IGNORECASE,
 )
 STRUCTURAL_SLASH_RE = re.compile(r"^/+$")
+TRAILING_ANNOTATION_RE = re.compile(r"\s+\(")
 
 
 def _root(key: str) -> str:
@@ -107,15 +108,24 @@ def is_chord_line(text: str) -> bool:
     stripped = text.strip()
     if not stripped or stripped.startswith("[") or TOM_RE.search(stripped):
         return False
+    musical_text, _ = split_trailing_annotation(stripped)
     tokens = [
         token
-        for token in re.findall(r"[^\s|]+", stripped)
+        for token in re.findall(r"[^\s|]+", musical_text)
         if not STRUCTURAL_SLASH_RE.fullmatch(token)
     ]
     if not tokens:
         return False
     valid = sum(bool(CHORD_RE.fullmatch(t)) for t in tokens)
     return valid >= (1 if len(tokens) <= 2 else 2) and valid / len(tokens) >= 0.6
+
+
+def split_trailing_annotation(text: str) -> tuple[str, str]:
+    """Separate a parenthetical performance note from the chord progression."""
+    match = TRAILING_ANNOTATION_RE.search(text)
+    if not match:
+        return text, ""
+    return text[:match.start()], text[match.start():]
 
 
 def is_nashville_line(text: str) -> bool:

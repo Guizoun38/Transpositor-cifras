@@ -5,7 +5,8 @@ from domain.errors import InvalidConversionRequestError
 from domain.models import ConversionMode
 from domain.music import (chord_to_nashville, is_chord_line,
                           is_nashville_line, is_original_key_metadata,
-                          nashville_to_chord, replace_key, transpose_chord)
+                          nashville_to_chord, replace_key,
+                          split_trailing_annotation, transpose_chord)
 
 
 def validate_request(request: ConversionRequest):
@@ -33,10 +34,11 @@ def convert_musical_text(text: str, request: ConversionRequest) -> str:
         ConversionMode.CHORDS_TO_NASHVILLE: lambda token: chord_to_nashville(token, request.source_key),
         ConversionMode.NASHVILLE_TO_CHORDS: lambda token: nashville_to_chord(token, request.target_key),
     }[request.mode]
+    musical_text, annotation = split_trailing_annotation(text) if chord_mode else (text, "")
     pattern = r"[A-G](?:#|b)?[^\s|/]*(?:/[A-G](?:#|b)?)?" if chord_mode else r"[b#]?[1-7][^\s|/]*(?:/[b#]?[1-7])?"
     def repl(match):
         try:
             return converter(match.group())
         except ValueError:
             return match.group()
-    return re.sub(pattern, repl, text)
+    return re.sub(pattern, repl, musical_text) + annotation
