@@ -18,8 +18,19 @@ def test_lyrics_and_sections_are_not_chord_lines(text):
     assert is_chord_line(text) is False
 
 
-def test_only_header_key_is_changed():
-    assert replace_key("Felipe Rodrigues - Tom Ab; Bpm 69; 4/4", "C") == "Felipe Rodrigues - Tom C; Bpm 69; 4/4"
+def test_replace_key_changes_minister_key():
+    assert replace_key("Pra. Giovanna - Tom Ab", "C") == "Pra. Giovanna - Tom C"
+
+
+def test_original_key_metadata_is_preserved_during_conversion():
+    request = ConversionRequest(ConversionMode.CHORDS_TO_CHORDS, "E", "C")
+    metadata = "Artista/Banda: Fhop e Nívea Soares - Tom E; Bpm 72; 4/4"
+    assert convert_musical_text(metadata, request) == metadata
+
+
+def test_minister_key_is_changed_during_conversion():
+    request = ConversionRequest(ConversionMode.CHORDS_TO_CHORDS, "E", "C")
+    assert convert_musical_text("Pra. Giovanna - Tom E", request) == "Pra. Giovanna - Tom C"
 
 
 @pytest.mark.parametrize("chord, expected", [("Ab", "1"), ("Fm", "6m"), ("Bbm7", "2m7"),
@@ -45,6 +56,117 @@ def test_nashville_detection(text, expected):
     assert is_nashville_line(text) is expected
 
 
+@pytest.mark.parametrize("text", ["| E /// |", "| E //// |"])
+def test_short_chord_lines_with_repeated_slashes_are_detected(text):
+    assert is_chord_line(text) is True
+
+
+@pytest.mark.parametrize("text", ["| 6 /// |", "| 4 //// |"])
+def test_short_nashville_lines_with_repeated_slashes_are_detected(text):
+    assert is_nashville_line(text) is True
+
+
 def test_text_conversion_preserves_structure():
     request = ConversionRequest(ConversionMode.CHORDS_TO_CHORDS, "Ab", "C")
     assert convert_musical_text("| Ab / Eb / | Db / Ab / |", request) == "| C / G / | F / C / |"
+
+
+def test_intro_chord_line_is_transposed():
+    request = ConversionRequest(ConversionMode.CHORDS_TO_CHORDS, "E", "C")
+    assert convert_musical_text("| E /// |", request) == "| C /// |"
+
+
+def test_intro_chord_line_converts_to_nashville():
+    request = ConversionRequest(ConversionMode.CHORDS_TO_NASHVILLE, "E", None)
+    assert convert_musical_text("| E /// |", request) == "| 1 /// |"
+
+
+@pytest.mark.parametrize(
+    "source, expected",
+    [
+        (
+            "B A F#m   (frase guitarra em A)",
+            "5 4 2m   (frase guitarra em A)",
+        ),
+        (
+            "C#m DM E A G#m E (A partir da 3ªx - Apenas Guitarra e baixo)",
+            "6m b7M 1 4 3m 1 (A partir da 3ªx - Apenas Guitarra e baixo)",
+        ),
+        (
+            "| C#m /// | E /// | A/ G#m / | F#m / E / | (frase todos instrumentos Harmonia)",
+            "| 6m /// | 1 /// | 4/ 3m / | 2m / 1 / | (frase todos instrumentos Harmonia)",
+        ),
+    ],
+)
+def test_chord_lines_with_trailing_performance_notes_convert_to_nashville(source, expected):
+    request = ConversionRequest(ConversionMode.CHORDS_TO_NASHVILLE, "E", None)
+    assert convert_musical_text(source, request) == expected
+
+
+def test_parenthesized_chord_quality_is_still_converted():
+    request = ConversionRequest(ConversionMode.CHORDS_TO_NASHVILLE, "C", None)
+    assert convert_musical_text("C(add9) G", request) == "1(add9) 5"
+
+
+def test_parenthesized_progression_with_inline_note_converts_to_nashville():
+    request = ConversionRequest(ConversionMode.CHORDS_TO_NASHVILLE, "E", None)
+    source = "(| DbM /// | B /// | E /// | E /// | - Apenas 2ªx Notas do Baixo)"
+    expected = "(| 6M /// | 5 /// | 1 /// | 1 /// | - Apenas 2ªx Notas do Baixo)"
+    assert convert_musical_text(source, request) == expected
+
+
+def test_hyphen_between_chords_is_still_converted():
+    request = ConversionRequest(ConversionMode.CHORDS_TO_NASHVILLE, "C", None)
+    assert convert_musical_text("C - G", request) == "1 - 5"
+
+
+@pytest.mark.parametrize(
+    "source, expected",
+    [
+        (
+            "6m b7M 1 4 3m 1 (A partir da 3ªx - Apenas Guitarra e baixo)",
+            "Am BbM C F Em C (A partir da 3ªx - Apenas Guitarra e baixo)",
+        ),
+        (
+            "(| 6M /// | 5 /// | 1 /// | 1 /// | - Apenas 2ªx Notas do Baixo)",
+            "(| AM /// | G /// | C /// | C /// | - Apenas 2ªx Notas do Baixo)",
+        ),
+        (
+            "| 6m /// | 1 /// | 4/ 3m / | 2m / 1 / | (frase todos instrumentos Harmonia)",
+            "| Am /// | C /// | F/ Em / | Dm / C / | (frase todos instrumentos Harmonia)",
+        ),
+    ],
+)
+def test_nashville_lines_with_performance_notes_convert_to_chords(source, expected):
+    request = ConversionRequest(ConversionMode.NASHVILLE_TO_CHORDS, None, "C")
+    assert convert_musical_text(source, request) == expected
+
+
+def test_parenthesized_nashville_quality_is_still_converted():
+    request = ConversionRequest(ConversionMode.NASHVILLE_TO_CHORDS, None, "C")
+    assert convert_musical_text("1(add9) 5", request) == "C(add9) G"
+
+
+def test_ambiguous_hyphenated_nashville_text_remains_unchanged():
+    request = ConversionRequest(ConversionMode.NASHVILLE_TO_CHORDS, None, "C")
+    assert convert_musical_text("1 - 5", request) == "1 - 5"
+
+
+@pytest.mark.parametrize(
+    "source, expected",
+    [
+        ("4/ 3m", "F/ Em"),
+        ("/2m /1/", "/Dm /C/"),
+        ("5/7 1", "G/B C"),
+    ],
+)
+def test_nashville_degrees_with_structural_or_bass_slashes_convert(source, expected):
+    request = ConversionRequest(ConversionMode.NASHVILLE_TO_CHORDS, None, "C")
+    assert convert_musical_text(source, request) == expected
+
+
+@pytest.mark.parametrize("source, expected", [("| 6 /// |", "| A /// |"),
+                                                ("| 4 /// |", "| F /// |")])
+def test_intro_and_interlude_nashville_lines_convert_to_chords(source, expected):
+    request = ConversionRequest(ConversionMode.NASHVILLE_TO_CHORDS, None, "C")
+    assert convert_musical_text(source, request) == expected

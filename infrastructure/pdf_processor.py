@@ -45,6 +45,39 @@ def _span_for_word(spans, word_rect):
     return spans[0] if spans else {"size": 11, "color": 0, "origin": (word_rect.x0, word_rect.y1 - 1)}
 
 
+def _plan_line_changes(words, spans, converted_tokens):
+    """Reflow only tokens reached by a wider replacement, preserving glyph proportions."""
+    changes = []
+    rendered_end = None
+    previous_original_end = None
+    reflow_active = False
+
+    for word, new in zip(words, converted_tokens):
+        old = word[4]
+        rect = fitz.Rect(word[:4])
+        span = _span_for_word(spans, rect)
+        new_x = rect.x0
+
+        if reflow_active:
+            original_gap = max(rect.x0 - previous_original_end, 0)
+            preserved_gap = max(original_gap, 2.0)
+            new_x = max(new_x, rendered_end + preserved_gap)
+
+        moved = abs(new_x - rect.x0) > 0.01
+        if old != new or moved:
+            reflow_active = True
+            fontname = _base14_font(span)
+            fontsize = span.get("size", 11)
+            rendered_end = new_x + fitz.get_text_length(new, fontname=fontname, fontsize=fontsize)
+            changes.append((rect, new, span, new_x))
+        else:
+            rendered_end = rect.x1
+
+        previous_original_end = rect.x1
+
+    return changes
+
+
 def _page_lines(page):
     """Return words and their original spans grouped by PDF text line."""
     words_by_line = defaultdict(list)
@@ -81,27 +114,25 @@ class PdfProcessor(DocumentProcessor):
                 if converted_line == original_line or len(converted_tokens) != len(original_tokens):
                     continue
 
-                for word, old, new in zip(words, original_tokens, converted_tokens):
-                    if old == new:
-                        continue
-                    rect = fitz.Rect(word[:4])
-                    span = _span_for_word(spans, rect)
-                    changes.append((rect, new, span))
+                changes.extend(_plan_line_changes(words, spans, converted_tokens))
 
             # Only changed words are redacted. Lyrics, headings, links and all
             # other spans remain the original PDF objects and keep formatting.
-            for rect, _, _ in changes:
+            for rect, _, _, _ in changes:
                 page.add_redact_annot(rect, fill=(1, 1, 1))
             if changes:
                 page.apply_redactions()
 
-            for rect, text, span in changes:
+            for rect, text, span, new_x in changes:
                 baseline = span.get("origin", (rect.x0, rect.y1 - 1))[1]
+                point = fitz.Point(new_x, baseline)
+                fontsize = span.get("size", 11)
+                fontname = _base14_font(span)
                 page.insert_text(
-                    fitz.Point(rect.x0, baseline),
+                    point,
                     text,
-                    fontsize=span.get("size", 11),
-                    fontname=_base14_font(span),
+                    fontsize=fontsize,
+                    fontname=fontname,
                     color=_color(span.get("color", 0)),
                     overlay=True,
                 )
