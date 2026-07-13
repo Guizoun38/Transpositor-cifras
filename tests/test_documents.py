@@ -25,7 +25,9 @@ def _assert_replacement_fits_before_bars(result, expected):
     words = _pdf_words(converted)
     replacement = next(word for word in words if word[4] == expected)
     bars = next(word for word in words if word[4] == "///")
-    assert replacement[2] <= bars[0]
+    expected_width = fitz.get_text_length(expected, fontname="helv", fontsize=9)
+    assert abs((replacement[2] - replacement[0]) - expected_width) < 0.1
+    assert replacement[2] + 0.5 <= bars[0]
     assert abs((replacement[3] - replacement[1]) - (bars[3] - bars[1])) < 0.1
     assert bars[4] == "///"
     converted.close()
@@ -183,7 +185,7 @@ def test_pdf_nashville_lines_with_performance_notes_convert_to_chords():
     words = [word[4] for word in _pdf_words(converted)]
 
     assert all(token in words for token in ("Am", "BbM", "AM", "G", "C", "F/", "Em", "Dm"))
-    assert all(token in words for token in ("Apenas", "Guitarra", "Notas", "Harmonia)"))
+    assert all(token in words for token in ("Apenas", "Guitarra", "2x", "Notas", "Harmonia)"))
     assert not any(token in words for token in ("6m", "b7M", "6M", "3m", "2m"))
     converted.close()
 

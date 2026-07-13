@@ -45,15 +45,37 @@ def _span_for_word(spans, word_rect):
     return spans[0] if spans else {"size": 11, "color": 0, "origin": (word_rect.x0, word_rect.y1 - 1)}
 
 
-def _horizontal_scale(text, fontname, fontsize, available_width):
-    """Fit replacement text before the next PDF token without changing its height."""
-    if available_width is None:
-        return 1.0
-    text_width = fitz.get_text_length(text, fontname=fontname, fontsize=fontsize)
-    safe_width = max(available_width - 0.25, 0)
-    if not text_width or text_width <= safe_width:
-        return 1.0
-    return safe_width / text_width
+def _plan_line_changes(words, spans, converted_tokens):
+    """Reflow only tokens reached by a wider replacement, preserving glyph proportions."""
+    changes = []
+    rendered_end = None
+    previous_original_end = None
+    reflow_active = False
+
+    for word, new in zip(words, converted_tokens):
+        old = word[4]
+        rect = fitz.Rect(word[:4])
+        span = _span_for_word(spans, rect)
+        new_x = rect.x0
+
+        if reflow_active:
+            original_gap = max(rect.x0 - previous_original_end, 0)
+            preserved_gap = max(original_gap, 2.0)
+            new_x = max(new_x, rendered_end + preserved_gap)
+
+        moved = abs(new_x - rect.x0) > 0.01
+        if old != new or moved:
+            reflow_active = True
+            fontname = _base14_font(span)
+            fontsize = span.get("size", 11)
+            rendered_end = new_x + fitz.get_text_length(new, fontname=fontname, fontsize=fontsize)
+            changes.append((rect, new, span, new_x))
+        else:
+            rendered_end = rect.x1
+
+        previous_original_end = rect.x1
+
+    return changes
 
 
 def _page_lines(page):
@@ -92,13 +114,7 @@ class PdfProcessor(DocumentProcessor):
                 if converted_line == original_line or len(converted_tokens) != len(original_tokens):
                     continue
 
-                for index, (word, old, new) in enumerate(zip(words, original_tokens, converted_tokens)):
-                    if old == new:
-                        continue
-                    rect = fitz.Rect(word[:4])
-                    span = _span_for_word(spans, rect)
-                    available_width = words[index + 1][0] - rect.x0 if index + 1 < len(words) else None
-                    changes.append((rect, new, span, available_width))
+                changes.extend(_plan_line_changes(words, spans, converted_tokens))
 
             # Only changed words are redacted. Lyrics, headings, links and all
             # other spans remain the original PDF objects and keep formatting.
@@ -107,19 +123,17 @@ class PdfProcessor(DocumentProcessor):
             if changes:
                 page.apply_redactions()
 
-            for rect, text, span, available_width in changes:
+            for rect, text, span, new_x in changes:
                 baseline = span.get("origin", (rect.x0, rect.y1 - 1))[1]
-                point = fitz.Point(rect.x0, baseline)
+                point = fitz.Point(new_x, baseline)
                 fontsize = span.get("size", 11)
                 fontname = _base14_font(span)
-                scale = _horizontal_scale(text, fontname, fontsize, available_width)
                 page.insert_text(
                     point,
                     text,
                     fontsize=fontsize,
                     fontname=fontname,
                     color=_color(span.get("color", 0)),
-                    morph=(point, fitz.Matrix(scale, 1)) if scale < 1 else None,
                     overlay=True,
                 )
 
