@@ -135,10 +135,11 @@ def is_nashville_line(text: str) -> bool:
     stripped = text.strip()
     if not stripped or stripped.startswith("[") or re.search(r"\b(?:bpm|tom)\b", stripped, re.I) or re.fullmatch(r"\s*4/4\s*", stripped):
         return False
+    musical_text, _ = split_trailing_annotation(stripped)
     tokens = [
-        token
-        for token in re.findall(r"[^\s|]+", stripped)
-        if not STRUCTURAL_SLASH_RE.fullmatch(token)
+        token.strip("/")
+        for token in re.findall(r"[^\s|]+", musical_text)
+        if token.strip("/")
     ]
     return bool(tokens) and sum(bool(NASHVILLE_RE.fullmatch(t)) for t in tokens) / len(tokens) >= 0.7
 

@@ -120,6 +120,51 @@ def test_hyphen_between_chords_is_still_converted():
     assert convert_musical_text("C - G", request) == "1 - 5"
 
 
+@pytest.mark.parametrize(
+    "source, expected",
+    [
+        (
+            "6m b7M 1 4 3m 1 (A partir da 3ªx - Apenas Guitarra e baixo)",
+            "Am BbM C F Em C (A partir da 3ªx - Apenas Guitarra e baixo)",
+        ),
+        (
+            "(| 6M /// | 5 /// | 1 /// | 1 /// | - Apenas 2ªx Notas do Baixo)",
+            "(| AM /// | G /// | C /// | C /// | - Apenas 2ªx Notas do Baixo)",
+        ),
+        (
+            "| 6m /// | 1 /// | 4/ 3m / | 2m / 1 / | (frase todos instrumentos Harmonia)",
+            "| Am /// | C /// | F/ Em / | Dm / C / | (frase todos instrumentos Harmonia)",
+        ),
+    ],
+)
+def test_nashville_lines_with_performance_notes_convert_to_chords(source, expected):
+    request = ConversionRequest(ConversionMode.NASHVILLE_TO_CHORDS, None, "C")
+    assert convert_musical_text(source, request) == expected
+
+
+def test_parenthesized_nashville_quality_is_still_converted():
+    request = ConversionRequest(ConversionMode.NASHVILLE_TO_CHORDS, None, "C")
+    assert convert_musical_text("1(add9) 5", request) == "C(add9) G"
+
+
+def test_ambiguous_hyphenated_nashville_text_remains_unchanged():
+    request = ConversionRequest(ConversionMode.NASHVILLE_TO_CHORDS, None, "C")
+    assert convert_musical_text("1 - 5", request) == "1 - 5"
+
+
+@pytest.mark.parametrize(
+    "source, expected",
+    [
+        ("4/ 3m", "F/ Em"),
+        ("/2m /1/", "/Dm /C/"),
+        ("5/7 1", "G/B C"),
+    ],
+)
+def test_nashville_degrees_with_structural_or_bass_slashes_convert(source, expected):
+    request = ConversionRequest(ConversionMode.NASHVILLE_TO_CHORDS, None, "C")
+    assert convert_musical_text(source, request) == expected
+
+
 @pytest.mark.parametrize("source, expected", [("| 6 /// |", "| A /// |"),
                                                 ("| 4 /// |", "| F /// |")])
 def test_intro_and_interlude_nashville_lines_convert_to_chords(source, expected):

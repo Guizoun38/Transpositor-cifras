@@ -34,7 +34,7 @@ def convert_musical_text(text: str, request: ConversionRequest) -> str:
         ConversionMode.CHORDS_TO_NASHVILLE: lambda token: chord_to_nashville(token, request.source_key),
         ConversionMode.NASHVILLE_TO_CHORDS: lambda token: nashville_to_chord(token, request.target_key),
     }[request.mode]
-    musical_text, annotation = split_trailing_annotation(text) if chord_mode else (text, "")
+    musical_text, annotation = split_trailing_annotation(text)
     pattern = r"[A-G](?:#|b)?[^\s|/]*(?:/[A-G](?:#|b)?)?" if chord_mode else r"[b#]?[1-7][^\s|/]*(?:/[b#]?[1-7])?"
     def repl(match):
         try:
