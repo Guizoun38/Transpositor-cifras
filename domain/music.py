@@ -19,6 +19,7 @@ ORIGINAL_KEY_CONTEXT_RE = re.compile(
 )
 STRUCTURAL_SLASH_RE = re.compile(r"^/+$")
 TRAILING_ANNOTATION_RE = re.compile(r"\s+\(")
+WRAPPED_ANNOTATION_RE = re.compile(r"(?<=\|)\s+(?=-\s+[^|]*\)\s*$)")
 
 
 def _root(key: str) -> str:
@@ -121,8 +122,10 @@ def is_chord_line(text: str) -> bool:
 
 
 def split_trailing_annotation(text: str) -> tuple[str, str]:
-    """Separate a parenthetical performance note from the chord progression."""
+    """Separate a performance note from the chord progression that precedes it."""
     match = TRAILING_ANNOTATION_RE.search(text)
+    if not match:
+        match = WRAPPED_ANNOTATION_RE.search(text)
     if not match:
         return text, ""
     return text[:match.start()], text[match.start():]

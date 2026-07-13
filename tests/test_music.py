@@ -108,6 +108,18 @@ def test_parenthesized_chord_quality_is_still_converted():
     assert convert_musical_text("C(add9) G", request) == "1(add9) 5"
 
 
+def test_parenthesized_progression_with_inline_note_converts_to_nashville():
+    request = ConversionRequest(ConversionMode.CHORDS_TO_NASHVILLE, "E", None)
+    source = "(| DbM /// | B /// | E /// | E /// | - Apenas 2ªx Notas do Baixo)"
+    expected = "(| 6M /// | 5 /// | 1 /// | 1 /// | - Apenas 2ªx Notas do Baixo)"
+    assert convert_musical_text(source, request) == expected
+
+
+def test_hyphen_between_chords_is_still_converted():
+    request = ConversionRequest(ConversionMode.CHORDS_TO_NASHVILLE, "C", None)
+    assert convert_musical_text("C - G", request) == "1 - 5"
+
+
 @pytest.mark.parametrize("source, expected", [("| 6 /// |", "| A /// |"),
                                                 ("| 4 /// |", "| F /// |")])
 def test_intro_and_interlude_nashville_lines_convert_to_chords(source, expected):

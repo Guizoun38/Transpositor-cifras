@@ -82,7 +82,8 @@ def test_docx_chord_lines_with_performance_notes_convert_to_nashville():
     original.add_paragraph(
         "B A F#m   (frase guitarra em A)\n"
         "C#m DM E A G#m E (A partir da 3ªx - Apenas Guitarra e baixo)\n"
-        "| C#m /// | E /// | A/ G#m / | F#m / E / | (frase todos instrumentos Harmonia)"
+        "| C#m /// | E /// | A/ G#m / | F#m / E / | (frase todos instrumentos Harmonia)\n"
+        "(| DbM /// | B /// | E /// | E /// | - Apenas 2ªx Notas do Baixo)"
     )
     source = io.BytesIO()
     original.save(source)
@@ -94,6 +95,7 @@ def test_docx_chord_lines_with_performance_notes_convert_to_nashville():
     assert "5 4 2m   (frase guitarra em A)" in text
     assert "6m b7M 1 4 3m 1 (A partir da 3ªx - Apenas Guitarra e baixo)" in text
     assert "| 6m /// | 1 /// | 4/ 3m / | 2m / 1 / | (frase todos instrumentos Harmonia)" in text
+    assert "(| 6M /// | 5 /// | 1 /// | 1 /// | - Apenas 2ªx Notas do Baixo)" in text
 
 
 def test_generated_pdf_integration():
@@ -120,6 +122,21 @@ def test_generated_pdf_chords_to_nashville_remain_visible():
     words = [word[4] for word in _pdf_words(converted)]
     assert all(token in words for token in ("19", "5sus4", "2m7", "4"))
     assert not any(token in words for token in ("Ab9", "Ebsus4", "Bbm7", "Db"))
+    converted.close()
+
+
+def test_pdf_parenthesized_progression_with_inline_note_converts_to_nashville():
+    source_doc = fitz.open(); page = source_doc.new_page()
+    page.insert_text((72, 72), "(| DbM /// | B /// | E /// | E /// | - Apenas 2x Notas do Baixo)")
+    source = source_doc.tobytes(); source_doc.close()
+    request = ConversionRequest(ConversionMode.CHORDS_TO_NASHVILLE, "E", None)
+
+    result = process_document(source, ".pdf", request)
+    converted = fitz.open(stream=result, filetype="pdf")
+    words = [word[4] for word in _pdf_words(converted)]
+
+    assert all(token in words for token in ("6M", "5", "1", "Apenas", "Notas", "Baixo)"))
+    assert not any(token in words for token in ("DbM", "B", "E"))
     converted.close()
 
 
